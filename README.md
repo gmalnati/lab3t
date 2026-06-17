@@ -1,15 +1,30 @@
-# GitOps Lab — Deploy via Argo CD (Lab 3)
+# GitOps Lab: Deploy via Argo CD (Lab 3)
 
 This is a **skeleton** you clone, then use to bootstrap your own **config repo**:
-the kind of repository Argo CD watches. A config repo holds *what runs where* —
-a Helm chart plus one values file per environment — and nothing else. There is
-no application source code here on purpose: the app is built in Lab 2 (the
-`workshop-application` repo) and published as an immutable image. This repo only
-declares the desired state of your cluster.
+the kind of repository Argo CD watches. A config repo holds *what runs where*: a
+Helm chart, one values file per environment, and the Argo CD `Application`
+manifests that point at them. There is no application source code here on
+purpose. The app is built in Lab 2 (the `workshop-application` repo) and
+published as an immutable image, so this repo only declares the desired state of
+your cluster.
 
-> **Block 5 — Delivery & GitOps.** Git becomes the single source of truth for
-> what runs where. The cluster *pulls* its desired state and reconciles toward
-> it. Nobody runs `kubectl apply` by hand; a reverted commit is a rollback.
+## What you'll do in this lab
+
+A quick map before the details:
+
+1. **Apply the GitOps methodology** by splitting configuration from code: the
+   application and its image come from Lab 2, while *what runs where* lives in
+   this separate config repo.
+2. **Configure Argo CD** to reconcile that application (its Helm chart is
+   provided here) onto your Kubernetes cluster, so the cluster pulls its desired
+   state from Git instead of you running `kubectl apply` for every change.
+3. **(Appendix) Automate the deployment** by modifying a CI workflow so it
+   produces an immutable image artifact and updates the config automatically on
+   every push.
+
+> **Delivery & GitOps.** Git becomes the single source of truth for what runs
+> where. The cluster *pulls* its desired state and reconciles toward it. Nobody
+> runs `kubectl apply` of the app by hand; a reverted commit is a rollback.
 
 ## How the two repos relate
 
@@ -24,16 +39,16 @@ declares the desired state of your cluster.
                                             your cluster reconciles toward Git
 ```
 
-## What's in this skeleton — and why
+## What's in this skeleton, and where it goes
 
 | Path | What it is | Where it goes |
 |------|-----------|---------------|
 | `deploy/chart/` | The base manifests as a Helm chart (Deployment, Service, optional Ingress). Environment-agnostic. | **Pushed** into your config repo |
-| `deploy/envs/values-{dev,staging,prod}.yaml` | The per-environment differences — image tag, replicas, resources, ingress host. Thin overlays on the chart. | **Pushed** into your config repo |
-| `argocd/repo-secret.yaml` | Credentials so Argo CD can pull your *private* config repo (a GitHub PAT). | **Applied** to the cluster (`kubectl`) — stays in your local clone |
-| `argocd/app-dev.yaml` | An Argo CD `Application`: "deploy `deploy/chart` with `values-dev.yaml` into namespace `demo-dev`, auto-sync." | **Applied** to the cluster |
-| `argocd/app-staging.yaml` | Same, for staging — auto-sync, the place your test gates run. | **Applied** to the cluster |
-| `argocd/app-prod.yaml` | Same, for prod — but **manual sync** (no `automated:`). Promotion needs a human. | **Applied** to the cluster |
+| `deploy/envs/values-{dev,staging,prod}.yaml` | The per-environment differences (image tag, replicas, resources, ingress host). Thin overlays on the chart. | **Pushed** into your config repo |
+| `argocd/app-dev.yaml` | An Argo CD `Application`: "deploy `deploy/chart` with `values-dev.yaml` into namespace `demo-dev`, auto-sync." | **Pushed** into your config repo **and** applied with `kubectl` |
+| `argocd/app-staging.yaml` | Same, for staging: auto-sync, the place your test gates run. | **Pushed** into your config repo **and** applied with `kubectl` |
+| `argocd/app-prod.yaml` | Same, for prod, but **manual sync** (no `automated:`). Promotion needs a human. | **Pushed** into your config repo **and** applied with `kubectl` |
+| `argocd/repo-secret.yaml` | Credentials so Argo CD can pull your *private* config repo (a GitHub PAT). | **Applied** with `kubectl`, **not committed** (it holds a secret) |
 
 **Why three `Application`s?** Each one maps one environment to one namespace,
 pointing at the same chart but a different values file. That's the
@@ -43,10 +58,12 @@ changes by accident.
 
 ## Your environment (already provided)
 
-- A **personal cluster** — you have a kubeconfig for it. Point `kubectl` at it:
-  `export KUBECONFIG=/path/to/your-kubeconfig`.
+- A **personal cluster**: you have a kubeconfig for it. Point `kubectl` at it
+  with `export KUBECONFIG=/path/to/your-kubeconfig`.
 - **Argo CD** is already installed in the `argocd` namespace. Its UI is at
-  `https://ecXY-argo.ff26.it` (replace `XY` with your participant number).
+  `https://ec-0X-argocd.ff26.it` (replace `0X` with your participant number).
+  The login username and password are in the `INSTRUCTIONS.md` you received in
+  the kit (the zip with your kubeconfig).
 - **Traefik** is the ingress controller (`ingressClassName: traefik`).
 - A shared image **registry** at `registry.ff26.it`.
 - **external-dns + a Cloudflare tunnel** are wired up: any Ingress carrying the
@@ -64,33 +81,46 @@ changes by accident.
 
 # The lab
 
-## Step 1 — Create your config repo
+## Step 1: Create your config repo
 
 On GitHub, create a new repository named **`workshop-git-ops-configuration`**
-(private is fine — that's why we set up the PAT). Leave it empty.
+(private is fine; that's why we set up the PAT). Leave it empty.
 
-## Step 2 — Push the `deploy/` folder into it
+## Step 2: Push the config into it
 
-Clone your new repo and copy the `deploy/` folder from this skeleton into it:
+Clone your new repo and copy both `deploy/` and the Argo CD `Application`
+manifests from this skeleton into it:
 
 ```bash
 git clone git@github.com:<you>/workshop-git-ops-configuration.git
 cp -r /path/to/lab3t/deploy workshop-git-ops-configuration/
+mkdir -p workshop-git-ops-configuration/argocd
+cp /path/to/lab3t/argocd/app-*.yaml workshop-git-ops-configuration/argocd/
 cd workshop-git-ops-configuration
 ```
 
-> Only `deploy/` goes into the config repo. The `argocd/` manifests stay in your
-> local clone of the skeleton — you apply them to the cluster with `kubectl`.
+> Both `deploy/` and the Argo CD `Application` manifests (`argocd/app-*.yaml`)
+> are versioned in the config repo. The one file that stays out is
+> `argocd/repo-secret.yaml`: it holds a PAT, so keep it in your local skeleton
+> clone and apply it straight to the cluster with `kubectl` (Step 4).
 
-## Step 3 — Make the values yours (the only edits you need)
+## Step 3: Make the values yours (the only edits you need)
 
-These are the "trivial" edits that make the skeleton *your* lab:
+These are the small edits that make the skeleton *your* lab. In your config-repo
+clone:
 
 1. In `deploy/envs/values-dev.yaml` (and staging/prod if you use them), replace
-   `ecXY` in the `host:` with your participant number, e.g. `ec07-quote-dev.ff26.it`.
-2. Leave `image.tag: "REPLACE_ME"` for now — you'll set it in Step 7 once you've
-   built an image. (Until then the pod will be `ImagePullBackOff`; that's
-   expected and you'll *see* it in the Argo UI.)
+   `ec-0X` in the `host:` with your participant number, e.g.
+   `ec-06-pricingservice-dev.ff26.it`.
+2. In `deploy/chart/values.yaml`, replace `ec-0X` in the image `repository`
+   (`registry.ff26.it/ec-0X/workshop-application`) with your participant number,
+   so it points at your own namespace on the registry.
+3. In `argocd/app-dev.yaml` (and staging/prod if you use them), set `repoURL` to
+   your config-repo URL. It must match the `url` you'll put in
+   `repo-secret.yaml` (Step 4).
+4. Leave `image.tag: "REPLACE_ME"` for now. You'll set it in Step 7 once you've
+   built an image. Until then the pod will be `ImagePullBackOff`, which is
+   expected, and you'll *see* it in the Argo UI.
 
 Sanity-check the chart renders before Argo CD ever touches it:
 
@@ -101,12 +131,12 @@ helm template demo-app deploy/chart -f deploy/envs/values-dev.yaml
 Commit and push:
 
 ```bash
-git add deploy
-git commit -m "GitOps config: chart + env overlays for ecXY"
+git add deploy argocd
+git commit -m "GitOps config: chart, env overlays, and Argo CD apps for ec-0X"
 git push -u origin main
 ```
 
-## Step 4 — Create a PAT and give Argo CD read access
+## Step 4: Create a PAT and give Argo CD read access
 
 Argo CD runs in your cluster and pulls a *private* repo, so it needs a credential.
 
@@ -114,69 +144,73 @@ Argo CD runs in your cluster and pulls a *private* repo, so it needs a credentia
    create a token (fine-grained, **Contents: Read-only** on
    `workshop-git-ops-configuration`, or a classic token with `repo` scope).
 2. In your local clone of this skeleton, edit `argocd/repo-secret.yaml`: set
-   `url`, `username` (your GitHub username), and `password` (the PAT).
-3. Apply it:
+   `url`, `username` (your GitHub username), and `password` (the PAT). This file
+   is the one thing you never commit, since it carries the PAT.
+3. Apply it straight from the skeleton clone:
 
 ```bash
 kubectl apply -f argocd/repo-secret.yaml
 ```
 
-## Step 5 — Apply the dev Application
+## Step 5: Apply the dev Application
 
-Edit `argocd/app-dev.yaml` and set `repoURL` to your config repo URL (it must
-match the `url` in `repo-secret.yaml`). Then:
+You already set `repoURL` in `argocd/app-dev.yaml` back in Step 3, so apply it
+from your config-repo clone:
 
 ```bash
 kubectl apply -f argocd/app-dev.yaml
 kubectl get applications -n argocd
 ```
 
-## Step 6 — Open the UI and watch
+## Step 6: Open the UI and watch
 
-Open `https://ecXY-argo.ff26.it` and log in (user `admin`; the initial password
-is in the `argocd-initial-admin-secret` Secret if it hasn't been changed):
+Open `https://ec-0X-argocd.ff26.it` and log in. The username and password are in
+the `INSTRUCTIONS.md` from your kit. If the admin password hasn't been changed,
+you can also pull it from the cluster:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-Watch Argo CD clone your repo, render the chart, and create the Deployment +
-Service + Ingress in `demo-dev`. The Deployment will be **Progressing /
-ImagePullBackOff** because the image tag is still `REPLACE_ME` — that's the
-whole point of looking now: you can *see* the desired state and why it isn't
-healthy yet.
+Watch Argo CD clone your repo, render the chart, and create the Deployment,
+Service, and Ingress in `demo-dev`. The Deployment will be **Progressing /
+ImagePullBackOff** because the image tag is still `REPLACE_ME`. That's the whole
+point of looking now: you can *see* the desired state and why it isn't healthy
+yet.
 
-## Step 7 — Build & push your image, then point the config at it
+## Step 7: Build and push your image, then point the config at it
 
 Now give it a real image. From your **`workshop-application`** clone (Lab 2):
 
 ```bash
 cd /path/to/workshop-application
 
-# Tag uniquely so you don't collide with other participants on the shared
-# registry: ec<your-number>-<git short sha>.
-export TAG=ec07-$(git rev-parse --short HEAD)     # <-- replace ec07
+# Your images live under your own per-user namespace on the shared registry,
+# so you don't collide with other participants:
+#   registry.ff26.it/ec-0X/...   (replace ec-0X with your participant number)
+export NS=ec-0X                                   # <-- replace ec-0X
+export TAG=$(git rev-parse --short HEAD)
 
 # Build the container (a Dockerfile ships in the workshop-application repo):
-docker build -t registry.ff26.it/workshop-application:$TAG .
+docker build -t registry.ff26.it/$NS/workshop-application:$TAG .
 
 # Log in to the registry (credentials provided to you), then push:
 docker login registry.ff26.it
-docker push registry.ff26.it/workshop-application:$TAG
+docker push registry.ff26.it/$NS/workshop-application:$TAG
 
-echo "Pushed tag: $TAG"   # write this down
+echo "Pushed image: registry.ff26.it/$NS/workshop-application:$TAG"   # write this down
 ```
 
-Take note of the tag (and the `sha256:` digest the push prints — that digest is
+Take note of the tag (and the `sha256:` digest the push prints; that digest is
 the truly immutable reference). Now commit it into the config repo:
 
 ```bash
 cd /path/to/workshop-git-ops-configuration
 # set image.tag in deploy/envs/values-dev.yaml to your $TAG, e.g.:
 #   image:
-#     tag: "ec07-a1b2c3d"
-git commit -am "dev: deploy image ec07-a1b2c3d"
+#     tag: "a1b2c3d"
+git commit -am "dev: deploy image a1b2c3d"
 git push
 ```
 
@@ -185,15 +219,20 @@ Deployment. Watch it go **Synced / Healthy**:
 
 ```bash
 kubectl rollout status deployment/demo-app-dev -n demo-dev
-curl -s -X POST https://ecXY-quote-dev.ff26.it/quote \
+curl -s -X POST https://ec-0X-pricingservice-dev.ff26.it/quote \
   -H 'Content-Type: application/json' -d '{"subtotal": 150.00}'
 # {"subtotal":150.00,"total":135.00}
 ```
 
+> Don't want to wait for the poll? In the Argo CD UI you can hit **Refresh** to
+> re-check Git now, then **Sync** to reconcile immediately. This also kicks the
+> app out of any retry backoff left over from the earlier `ImagePullBackOff`,
+> rather than waiting for the retry timer.
+
 That's the full GitOps loop: **you changed Git, the cluster followed. No
 `kubectl apply` of the app, no `kubectl set image`.**
 
-## Step 8 — Iterate (and roll back)
+## Step 8: Iterate (and roll back)
 
 From now on the inner loop is: **change code → build → push a new tag → commit
 the new tag in the config repo → Argo CD deploys it.**
@@ -206,50 +245,52 @@ git revert HEAD --no-edit   # or open a PR setting the tag back
 git push
 ```
 
-Argo CD reconciles `demo-dev` back to the previous image — no rollback tooling.
+Argo CD reconciles `demo-dev` back to the previous image, with no rollback tooling.
 
 > **Promotion.** To promote to staging/prod, set the same tag in
 > `values-staging.yaml` / `values-prod.yaml` and apply `app-staging.yaml` /
 > `app-prod.yaml`. Prod will sit **OutOfSync** until you click **Sync** in the
-> UI — that's the manual production gate.
+> UI. That's the manual production gate.
 
 ---
 
 ## Project layout
 
 ```
-workshop-git-ops-configuration/        # the repo YOU create (Steps 1–2)
-└─ deploy/
-   ├─ chart/                           # the base manifests (env-agnostic Helm chart)
-   │  ├─ Chart.yaml
-   │  ├─ values.yaml                   # chart defaults (registry, port 8080, traefik)
-   │  └─ templates/
-   │     ├─ _helpers.tpl
-   │     ├─ deployment.yaml            # + TCP liveness/readiness probes
-   │     ├─ service.yaml
-   │     └─ ingress.yaml               # traefik + external-dns annotation
-   └─ envs/
-      ├─ values-dev.yaml               # ← Step 7 sets image.tag here
-      ├─ values-staging.yaml
-      └─ values-prod.yaml
-
-lab3t/ (this skeleton clone — NOT pushed to the config repo)
-└─ argocd/
-   ├─ repo-secret.yaml                 # PAT so Argo CD can read the private repo
+workshop-git-ops-configuration/        # the repo YOU create (Steps 1 and 2)
+├─ deploy/
+│  ├─ chart/                           # the base manifests (env-agnostic Helm chart)
+│  │  ├─ Chart.yaml
+│  │  ├─ values.yaml                   # chart defaults (registry, port 8080, traefik)
+│  │  └─ templates/
+│  │     ├─ _helpers.tpl
+│  │     ├─ deployment.yaml            # TCP liveness/readiness probes
+│  │     ├─ service.yaml
+│  │     └─ ingress.yaml               # traefik + external-dns annotation
+│  └─ envs/
+│     ├─ values-dev.yaml               # Step 7 sets image.tag here
+│     ├─ values-staging.yaml
+│     └─ values-prod.yaml
+└─ argocd/                             # the Argo CD Applications, versioned here
    ├─ app-dev.yaml                     # automatic sync
-   ├─ app-staging.yaml                 # automatic + gates
+   ├─ app-staging.yaml                 # automatic, plus gates
    └─ app-prod.yaml                    # manual approval (no automated syncPolicy)
+
+lab3t/ (this skeleton clone)
+└─ argocd/
+   └─ repo-secret.yaml                 # PAT for Argo CD; applied with kubectl, never committed
 ```
 
 ---
 
-# Appendix — automate the whole loop from CI
+# Appendix: automate the whole loop from CI
 
-Doing it by hand teaches the model. In real life, your **`workshop-application`**
-pipeline builds, pushes, *and* bumps the config repo for you — so a `git push`
-to the app repo ends with a new version running in dev. Here's how.
+Doing it by hand first makes the moving parts clear. In real life, your
+**`workshop-application`** pipeline builds, pushes, *and* bumps the config repo
+for you, so a `git push` to the app repo ends with a new version running in dev.
+Here's how.
 
-### A1 — A PAT that can WRITE to the config repo
+### A1: A PAT that can WRITE to the config repo
 
 The app pipeline needs to commit to `workshop-git-ops-configuration`, so create
 a PAT with **Contents: Read and write** on that repo (or classic `repo` scope).
@@ -260,11 +301,11 @@ Add it as a secret on the **`workshop-application`** repo:
   - `CONFIG_REPO_TOKEN` = the write-PAT
   - `REGISTRY_USERNAME` / `REGISTRY_PASSWORD` = your `registry.ff26.it` credentials
 
-### A2 — Build & push, then bump the config repo
+### A2: Build and push, then bump the config repo
 
 Add this workflow to **`workshop-application`** as
-`.github/workflows/cd.yml`. It builds the image, pushes it to
-`registry.ff26.it` with a per-user tag, then checks out the config repo and
+`.github/workflows/cd.yml`. It builds the image, pushes it to your per-user
+namespace on `registry.ff26.it`, then checks out the config repo and
 bumps `values-dev.yaml`:
 
 ```yaml
@@ -274,8 +315,8 @@ on:
     branches: [main]
 
 env:
-  IMAGE: registry.ff26.it/workshop-application
-  PARTICIPANT: ec07          # <-- change me
+  # Your own per-user namespace on the shared registry (replace ec-0X).
+  IMAGE: registry.ff26.it/ec-0X/workshop-application   # <-- change ec-0X
 
 jobs:
   build-push:
@@ -286,8 +327,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: meta
-        name: Compute a per-user tag
-        run: echo "tag=${PARTICIPANT}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        name: Compute the image tag
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -306,7 +347,7 @@ jobs:
           push: true
           tags: ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
 
-      # Option B (no Dockerfile): use the Spring Boot buildpack task instead —
+      # Option B (no Dockerfile): use the Spring Boot buildpack task instead:
       #   ./gradlew bootBuildImage --imageName=$IMAGE:${{ steps.meta.outputs.tag }}
       #   docker push $IMAGE:${{ steps.meta.outputs.tag }}
 
@@ -339,18 +380,5 @@ image → commits the new tag to `workshop-git-ops-configuration` → Argo CD
 deploys it. That's Continuous Delivery end-to-end.
 
 > Pinning by digest (`@sha256:…`) instead of a tag is the more rigorous
-> version — the deck's "deploy by digest, not `latest`." Once comfortable,
-> have the workflow capture the pushed digest and write *that* into the values.
-
-## Notes for instructors
-
-- The app repo (`workshop-application`, Lab 2) and this config repo are
-  intentionally **separate**. A deploy here is a config change; the app's only
-  output is a tagged image.
-- `image.tag: REPLACE_ME` deliberately leaves the first sync unhealthy so
-  learners *see* the desired-state/observed-state gap in the Argo UI before
-  they supply a real image.
-- The Ingress annotation is identical for every participant (one shared
-  Cloudflare tunnel); only the `host` differs by participant number.
-- Prod is manual-sync to demonstrate the promotion gate. Flip `app-prod.yaml`
-  to `automated:` to show full Continuous Deployment and discuss the trade-off.
+> version: deploy by digest, not `latest`. Once comfortable, have the workflow
+> capture the pushed digest and write *that* into the values.

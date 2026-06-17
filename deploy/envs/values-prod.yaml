@@ -1,4 +1,4 @@
-# Prod overlay. Promote the SAME image tag that staging tested — never a
+# Prod overlay. Promote the SAME image tag that staging tested, never a
 # rebuild. Sync requires manual approval (see argocd/app-prod.yaml: no
 # automated syncPolicy).
 env: prod
@@ -9,8 +9,8 @@ image:
 
 ingress:
   enabled: true
-  # Replace XY with your participant number.
-  host: ecXY-quote.ff26.it
+  # Replace 0X with your participant number.
+  host: ec-0X-pricingservice.ff26.it
 
 resources:
   requests:

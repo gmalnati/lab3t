@@ -1,17 +1,18 @@
-# Dev overlay. Fast feedback, low stakes — Argo CD auto-syncs every merge.
-# In Step 6 you set image.tag here to the tag you built & pushed.
+# Dev overlay. Fast feedback, low stakes; Argo CD auto-syncs every merge.
+# In Step 7 you set image.tag here to the tag you built and pushed.
 env: dev
 replicaCount: 1
 
 image:
-  # Replace REPLACE_ME with the tag you pushed, e.g. ec07-a1b2c3d
-  # (see the README: tag = ec<your-number>-<git short sha>).
+  # Replace REPLACE_ME with the tag you pushed, e.g. a1b2c3d
+  # (see the README: tag = <git short sha>; your per-user namespace lives in
+  # the image repository, set in deploy/chart/values.yaml).
   tag: "REPLACE_ME"
 
 ingress:
   enabled: true
-  # Replace XY with your participant number, e.g. ec07-quote-dev.ff26.it
-  host: ecXY-quote-dev.ff26.it
+  # Replace 0X with your participant number, e.g. ec-06-pricingservice-dev.ff26.it
+  host: ec-0X-pricingservice-dev.ff26.it
 
 resources:
   requests:

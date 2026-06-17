@@ -10,8 +10,9 @@ replicaCount: 1
 
 image:
   # The image YOU build from the workshop-application repo (Lab 2) and push to
-  # the shared registry. Set the tag in each env overlay to the tag you pushed.
-  repository: registry.ff26.it/workshop-application
+  # the shared registry, under your own per-user namespace (replace ec-0X with
+  # your participant number). Set the tag in each env overlay to the one you pushed.
+  repository: registry.ff26.it/ec-0X/workshop-application
   tag: "REPLACE_ME"
   pullPolicy: IfNotPresent
 

@@ -8,8 +8,8 @@ image:
 
 ingress:
   enabled: true
-  # Replace XY with your participant number.
-  host: ecXY-quote-staging.ff26.it
+  # Replace 0X with your participant number.
+  host: ec-0X-pricingservice-staging.ff26.it
 
 resources:
   requests:
