@@ -1,0 +1,13 @@
+.DS_Store
+*.tmp
+.tokensave/
+
+# Local Helm output / rendered manifests
+*.rendered.yaml
+charts/
+
+# Never commit a filled-in repo-secret (it holds your PAT). Keep the PAT only
+# in your local copy; only the deploy/ folder is pushed to the config repo.
+argocd/repo-secret.local.yaml
+*.pat
+kubeconfig*

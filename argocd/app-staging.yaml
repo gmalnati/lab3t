@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # CHANGE ME: your workshop-git-ops-configuration repo.
+    repoURL: https://github.com/<you>/workshop-git-ops-configuration.git
+    targetRevision: main
+    path: deploy/chart
+    helm:
+      releaseName: demo-app
+      valueFiles:
+        - ../envs/values-staging.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-staging
+  # Staging = automatic + gates. It auto-syncs; your integration/E2E suite is
+  # what gates promotion onward to prod (wire that into CI or a sync hook).
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,22 @@
+# Dev overlay. Fast feedback, low stakes — Argo CD auto-syncs every merge.
+# In Step 6 you set image.tag here to the tag you built & pushed.
+env: dev
+replicaCount: 1
+
+image:
+  # Replace REPLACE_ME with the tag you pushed, e.g. ec07-a1b2c3d
+  # (see the README: tag = ec<your-number>-<git short sha>).
+  tag: "REPLACE_ME"
+
+ingress:
+  enabled: true
+  # Replace XY with your participant number, e.g. ec07-quote-dev.ff26.it
+  host: ecXY-quote-dev.ff26.it
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

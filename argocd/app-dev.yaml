@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # CHANGE ME: your workshop-git-ops-configuration repo (the one you pushed
+    # the `deploy/` folder into). Must match the url in repo-secret.yaml.
+    repoURL: https://github.com/<you>/workshop-git-ops-configuration.git
+    targetRevision: main
+    path: deploy/chart
+    helm:
+      releaseName: demo-app
+      # Paths are relative to the chart dir (deploy/chart), so this resolves
+      # to deploy/envs/values-dev.yaml — still inside the repo, which Argo CD
+      # requires.
+      valueFiles:
+        - ../envs/values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-dev
+  # Dev = automatic. Every merge to main syncs without a human.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

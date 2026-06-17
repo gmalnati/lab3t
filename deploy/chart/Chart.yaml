@@ -1,0 +1,11 @@
+apiVersion: v2
+name: demo-app
+description: A minimal app chart used to teach GitOps promotion with Argo CD
+type: application
+
+# Chart version: bump when the templates change.
+version: 0.1.0
+
+# The app version is illustrative; the real deployed version is the image tag,
+# which lives in the per-environment values files under deploy/envs/.
+appVersion: "0.0.1"

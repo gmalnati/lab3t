@@ -1,0 +1,39 @@
+# Chart defaults. These are the "base" values; each environment overrides a
+# handful of them in deploy/envs/values-<env>.yaml. The whole point of the lab
+# is that dev/staging/prod differ ONLY in a few fields (image tag, replicas,
+# resources, ingress host) — never in the templates.
+
+# Which environment this release represents. Overridden per env.
+env: base
+
+replicaCount: 1
+
+image:
+  # The image YOU build from the workshop-application repo (Lab 2) and push to
+  # the shared registry. Set the tag in each env overlay to the tag you pushed.
+  repository: registry.ff26.it/workshop-application
+  tag: "REPLACE_ME"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  # The Spring Boot pricing service listens on 8080.
+  port: 8080
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+ingress:
+  enabled: false
+  # Every cluster ships Traefik as its ingress controller.
+  className: traefik
+  # external-dns reads this and creates the public DNS record pointing at the
+  # Cloudflare tunnel. It is the SAME for every participant — leave it as is.
+  annotations:
+    external-dns.alpha.kubernetes.io/target: 82051912-b874-49e9-955b-7a73552b75bc.cfargotunnel.com
+  host: ""

@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # CHANGE ME: your workshop-git-ops-configuration repo.
+    repoURL: https://github.com/<you>/workshop-git-ops-configuration.git
+    targetRevision: main
+    path: deploy/chart
+    helm:
+      releaseName: demo-app
+      valueFiles:
+        - ../envs/values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-prod
+  # Prod = manual approval. NOTE the absence of `automated:` — Argo CD will
+  # show the app OutOfSync and wait for a human to click Sync (or run
+  # `argocd app sync demo-app-prod`). Drift is still detected; it just isn't
+  # auto-applied.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

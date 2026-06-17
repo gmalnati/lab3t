@@ -1,0 +1,20 @@
+# Staging overlay. Same image as dev, more replicas. Auto-sync, then gates
+# (integration / E2E suites) run against it before promotion to prod.
+env: staging
+replicaCount: 2
+
+image:
+  tag: "REPLACE_ME"
+
+ingress:
+  enabled: true
+  # Replace XY with your participant number.
+  host: ecXY-quote-staging.ff26.it
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
