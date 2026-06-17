@@ -154,18 +154,20 @@ Now give it a real image. From your **`workshop-application`** clone (Lab 2):
 ```bash
 cd /path/to/workshop-application
 
-# Tag uniquely so you don't collide with other participants on the shared
-# registry: ec<your-number>-<git short sha>.
-export TAG=ec07-$(git rev-parse --short HEAD)     # <-- replace ec07
+# Your images live under your own per-user namespace on the shared registry,
+# so you don't collide with other participants:
+#   registry.ff26.it/ec-0X/...   (replace ec-0X with your participant number)
+export NS=ec-0X                                   # <-- replace ec-0X
+export TAG=$(git rev-parse --short HEAD)
 
 # Build the container (a Dockerfile ships in the workshop-application repo):
-docker build -t registry.ff26.it/workshop-application:$TAG .
+docker build -t registry.ff26.it/$NS/workshop-application:$TAG .
 
 # Log in to the registry (credentials provided to you), then push:
 docker login registry.ff26.it
-docker push registry.ff26.it/workshop-application:$TAG
+docker push registry.ff26.it/$NS/workshop-application:$TAG
 
-echo "Pushed tag: $TAG"   # write this down
+echo "Pushed image: registry.ff26.it/$NS/workshop-application:$TAG"   # write this down
 ```
 
 Take note of the tag (and the `sha256:` digest the push prints — that digest is
@@ -175,8 +177,8 @@ the truly immutable reference). Now commit it into the config repo:
 cd /path/to/workshop-git-ops-configuration
 # set image.tag in deploy/envs/values-dev.yaml to your $TAG, e.g.:
 #   image:
-#     tag: "ec07-a1b2c3d"
-git commit -am "dev: deploy image ec07-a1b2c3d"
+#     tag: "a1b2c3d"
+git commit -am "dev: deploy image a1b2c3d"
 git push
 ```
 
@@ -263,8 +265,8 @@ Add it as a secret on the **`workshop-application`** repo:
 ### A2 — Build & push, then bump the config repo
 
 Add this workflow to **`workshop-application`** as
-`.github/workflows/cd.yml`. It builds the image, pushes it to
-`registry.ff26.it` with a per-user tag, then checks out the config repo and
+`.github/workflows/cd.yml`. It builds the image, pushes it to your per-user
+namespace on `registry.ff26.it`, then checks out the config repo and
 bumps `values-dev.yaml`:
 
 ```yaml
@@ -274,8 +276,8 @@ on:
     branches: [main]
 
 env:
-  IMAGE: registry.ff26.it/workshop-application
-  PARTICIPANT: ec07          # <-- change me
+  # Your own per-user namespace on the shared registry (replace ec-0X).
+  IMAGE: registry.ff26.it/ec-0X/workshop-application   # <-- change ec-0X
 
 jobs:
   build-push:
@@ -286,8 +288,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: meta
-        name: Compute a per-user tag
-        run: echo "tag=${PARTICIPANT}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        name: Compute the image tag
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 

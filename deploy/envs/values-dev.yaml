@@ -4,8 +4,9 @@ env: dev
 replicaCount: 1
 
 image:
-  # Replace REPLACE_ME with the tag you pushed, e.g. ec07-a1b2c3d
-  # (see the README: tag = ec<your-number>-<git short sha>).
+  # Replace REPLACE_ME with the tag you pushed, e.g. a1b2c3d
+  # (see the README: tag = <git short sha>; your per-user namespace lives in
+  # the image repository, set in deploy/chart/values.yaml).
   tag: "REPLACE_ME"
 
 ingress:
