@@ -324,16 +324,16 @@ jobs:
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - id: meta
         name: Compute the image tag
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Log in to registry.ff26.it
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: registry.ff26.it
           username: ${{ secrets.REGISTRY_USERNAME }}
@@ -341,7 +341,7 @@ jobs:
 
       # Option A: build from the Dockerfile shipped in this repo.
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -356,7 +356,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the config repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: <you>/workshop-git-ops-configuration   # <-- change me
           token: ${{ secrets.CONFIG_REPO_TOKEN }}
